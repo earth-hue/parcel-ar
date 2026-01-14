@@ -1,124 +1,206 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Land Parcels (GPS AR) - iPhone Demo</title>
+<a-scene
+  embedded
+  vr-mode-ui="enabled:false"
+  arjs="sourceType: webcam; debugUIEnabled: false;"
+>
+  <!-- กล้องแบบ GPS + อ่านทิศ -->
+  <a-entity id="cam" gps-camera rotation-reader></a-entity>
 
-  <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- กลุ่มสำหรับวัตถุแปลงที่เราจะสร้างด้วย JS -->
+  <a-entity id="parcelRoot"></a-entity>
+</a-scene>
 
-  <!-- AR.js (A-Frame build includes gps-camera / gps-entity-place / rotation-reader) -->
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
+<script>
+  // =========================
+  // 1) ใส่พิกัดมุมแปลงของคุณ (Decimal Degrees)
+  // =========================
+  const corners = {
+    A: { lat: 14.3178888889, lon: 101.2749722222 },
+    B: { lat: 14.3178888889, lon: 101.2750000000 },
+    C: { lat: 14.3178333333, lon: 101.2750000000 },
+    D: { lat: 14.3178611111, lon: 101.2749166667 },
+  };
 
-  <style>
-    /* แถบ debug ด้านบน */
-    #hud {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      z-index: 9999;
-      padding: 10px 12px;
-      background: rgba(0,0,0,0.65);
-      color: #fff;
-      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      line-height: 1.35;
-      border-radius: 10px;
-      pointer-events: none;
-      white-space: pre-line;
+  // ปิดวงกลับ A เพื่อวนสร้างขอบเขต
+  const ring = ["A","B","C","D","A"];
+
+  // =========================
+  // 2) ปรับระยะถี่ของเสา/แท่ง (เมตร)
+  // =========================
+  const STEP_POST_M = 2;   // เสาถี่ ๆ ทุกกี่เมตร (ข้อ 1)
+  const STEP_BEAM_M = 1;   // แท่งเส้น (ทำเป็นกล่องสั้น ๆ ต่อกัน) ทุกกี่เมตร (ข้อ 2)
+
+  // =========================
+  // 3) สไตล์เสามุม (ข้อ 3: สี/ความสูงแยกมุม)
+  // =========================
+  const cornerStyle = {
+    A: { h: 3.8, r: 0.20, color: "#ff4d4d" }, // แดง
+    B: { h: 3.4, r: 0.20, color: "#4da6ff" }, // น้ำเงิน
+    C: { h: 3.0, r: 0.20, color: "#66cc66" }, // เขียว
+    D: { h: 3.6, r: 0.20, color: "#ffcc00" }, // เหลือง
+  };
+
+  // เสาถี่ ๆ ตามแนวขอบ (ขนาดเล็ก)
+  const edgePostStyle = { h: 1.0, r: 0.07, color: "#ffffff" };
+
+  // แท่งเส้น (กล่องสั้น ๆ ต่อกัน) ให้เหมือนเส้นขอบ
+  const beamStyle = { w: 0.18, h: 0.18, color: "#ffffff" }; // w/h คือหน้าตัด
+
+  // =========================
+  // Utility: ระยะประมาณ (เมตร) แบบเร็วสำหรับพื้นที่เล็ก
+  // =========================
+  const DEG_LAT_M = 111320; // 1 องศา lat ~ 111.32 กม.
+  function metersPerDegLon(latDeg) {
+    return 111320 * Math.cos(latDeg * Math.PI/180);
+  }
+
+  function distMeters(p1, p2) {
+    const mLon = metersPerDegLon((p1.lat + p2.lat)/2);
+    const dx = (p2.lon - p1.lon) * mLon;
+    const dy = (p2.lat - p1.lat) * DEG_LAT_M;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  function lerp(a,b,t){ return a + (b-a)*t; }
+
+  // =========================
+  // สร้าง entity ที่ตำแหน่ง GPS
+  // =========================
+  function makeGpsEntity(lat, lon) {
+    const e = document.createElement("a-entity");
+    e.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon};`);
+    return e;
+  }
+
+  function addCorner(root, label, p) {
+    const s = cornerStyle[label] || { h: 3.2, r: 0.2, color: "#ffffff" };
+
+    const e = makeGpsEntity(p.lat, p.lon);
+
+    const cyl = document.createElement("a-cylinder");
+    cyl.setAttribute("height", s.h);
+    cyl.setAttribute("radius", s.r);
+    cyl.setAttribute("position", `0 ${s.h/2} 0`);
+    cyl.setAttribute("material", `color: ${s.color}; opacity: 0.95;`);
+
+    const textBg = document.createElement("a-plane");
+    textBg.setAttribute("width", 1.2);
+    textBg.setAttribute("height", 0.55);
+    textBg.setAttribute("position", `0 ${s.h + 0.7} 0`);
+    textBg.setAttribute("material", `color: #000000; opacity: 0.55;`);
+
+    const txt = document.createElement("a-text");
+    txt.setAttribute("value", label);
+    txt.setAttribute("align", "center");
+    txt.setAttribute("width", "6");
+    txt.setAttribute("position", `0 ${s.h + 0.65} 0.01`);
+    txt.setAttribute("color", "#ffffff");
+
+    e.appendChild(cyl);
+    e.appendChild(textBg);
+    e.appendChild(txt);
+
+    root.appendChild(e);
+  }
+
+  // เสาถี่ ๆ (ข้อ 1)
+  function addEdgePost(root, lat, lon) {
+    const e = makeGpsEntity(lat, lon);
+
+    const cyl = document.createElement("a-cylinder");
+    cyl.setAttribute("height", edgePostStyle.h);
+    cyl.setAttribute("radius", edgePostStyle.r);
+    cyl.setAttribute("position", `0 ${edgePostStyle.h/2} 0`);
+    cyl.setAttribute("material", `color: ${edgePostStyle.color}; opacity: 0.85;`);
+
+    e.appendChild(cyl);
+    root.appendChild(e);
+  }
+
+  // แท่งเส้น (ข้อ 2): ทำเป็นกล่องสั้น ๆ ต่อกัน จะดูเป็นเส้นชัด โดยไม่ต้องคำนวณ rotation ซับซ้อน
+  function addBeamSegment(root, lat, lon, lenM) {
+    const e = makeGpsEntity(lat, lon);
+
+    const box = document.createElement("a-box");
+    // ให้ความยาวอยู่แกน Z ของกล่อง (A-Frame)
+    box.setAttribute("width", beamStyle.w);
+    box.setAttribute("height", beamStyle.h);
+    box.setAttribute("depth", Math.max(0.5, lenM));  // ยาวตามช่วง
+    box.setAttribute("position", `0 0.25 0`);
+    box.setAttribute("material", `color: ${beamStyle.color}; opacity: 0.7;`);
+
+    // หมายเหตุ: เราไม่หมุนกล่องตามแนวเส้น (เพื่อความง่ายบน GPS-AR)
+    // แต่พอทำถี่ ๆ มันจะ “เห็นเป็นเส้น” ได้ชัดอยู่แล้ว
+    e.appendChild(box);
+    root.appendChild(e);
+  }
+
+  // ป้ายกลางแปลง (เลือกได้)
+  function addCenterLabel(root, lat, lon) {
+    const e = makeGpsEntity(lat, lon);
+
+    const plane = document.createElement("a-plane");
+    plane.setAttribute("width", 4.6);
+    plane.setAttribute("height", 2.4);
+    plane.setAttribute("position", "0 2.6 0");
+    plane.setAttribute("material", "color: #000000; opacity: 0.55;");
+
+    const txt = document.createElement("a-text");
+    txt.setAttribute("value",
+      "ข้อมูลหน่วยที่ดิน (แสดงผล)\n" +
+      "หน่วยที่ดิน: (ใส่รหัสของคุณ)\n" +
+      "ประเภทที่ดิน: (ใส่ประเภท)\n" +
+      "ราคาประเมิน: (ใส่ราคา)\n\n" +
+      "หมายเหตุ: เพื่อการแสดงผล/ประกอบการชี้แจงเท่านั้น"
+    );
+    txt.setAttribute("position", "0 2.6 0.02");
+    txt.setAttribute("align", "center");
+    txt.setAttribute("width", "6.8");
+    txt.setAttribute("color", "#ffffff");
+
+    e.appendChild(plane);
+    e.appendChild(txt);
+    root.appendChild(e);
+  }
+
+  // สร้างจุดตามแนวเส้นจาก p1 -> p2 ทุก STEP เมตร
+  function sprinkleAlongEdge(p1, p2, stepM, cb) {
+    const d = distMeters(p1, p2);
+    const n = Math.max(1, Math.floor(d / stepM));
+    for (let i = 1; i < n; i++) { // ไม่รวมปลายทั้งสอง (กันซ้ำกับเสามุม)
+      const t = i / n;
+      const lat = lerp(p1.lat, p2.lat, t);
+      const lon = lerp(p1.lon, p2.lon, t);
+      cb(lat, lon, d/n);
     }
-  </style>
-</head>
+  }
 
-<body style="margin:0; overflow:hidden;">
-  <div id="hud">กำลังรอสิทธิ์ Camera/Location...</div>
+  // =========================
+  // Build everything
+  // =========================
+  window.addEventListener("DOMContentLoaded", () => {
+    const root = document.querySelector("#parcelRoot");
 
-  <a-scene
-    embedded
-    vr-mode-ui="enabled:false"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
-  >
-    <!-- กล้องแบบ GPS + อ่านทิศ -->
-    <a-entity id="cam" gps-camera rotation-reader></a-entity>
+    // (3) เสามุม + สี + ความสูง
+    for (const k of ["A","B","C","D"]) addCorner(root, k, corners[k]);
 
-    <!-- ====== มุมแปลง (Corner Posts) ====== -->
-<!-- มุม A -->
-<a-entity gps-entity-place="latitude: 14.3178888889; longitude: 101.2749722222;">
-  <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
-  <a-text value="A" position="0 3.6 0" align="center" width="8"></a-text>
-</a-entity>
+    // (1)+(2) สร้างขอบเขต: เสาถี่ ๆ + แท่งเส้น
+    for (let i = 0; i < ring.length - 1; i++) {
+      const p1 = corners[ring[i]];
+      const p2 = corners[ring[i+1]];
 
-<!-- มุม B -->
-<a-entity gps-entity-place="latitude: 14.3178888889; longitude: 101.2750000000;">
-  <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
-  <a-text value="B" position="0 3.6 0" align="center" width="8"></a-text>
-</a-entity>
+      // (1) เสาถี่ ๆ
+      sprinkleAlongEdge(p1, p2, STEP_POST_M, (lat, lon) => addEdgePost(root, lat, lon));
 
-<!-- มุม C -->
-<a-entity gps-entity-place="latitude: 14.3178333333; longitude: 101.2750000000;">
-  <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
-  <a-text value="C" position="0 3.6 0" align="center" width="8"></a-text>
-</a-entity>
-
-<!-- มุม D -->
-<a-entity gps-entity-place="latitude: 14.3178611111; longitude: 101.2749166667;">
-  <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
-  <a-text value="D" position="0 3.6 0" align="center" width="8"></a-text>
-</a-entity>
-
-    <!-- ====== ป้ายข้อมูลกลางแปลง ====== -->
-    <a-entity gps-entity-place="latitude: 14.3178263889; longitude: 101.2750277778;">
-      <a-plane width="4.6" height="2.4" position="0 2.6 0"></a-plane>
-      <a-text
-        value="ข้อมูลหน่วยที่ดิน (แสดงผล)\nหน่วยที่ดิน: (ใส่รหัสของคุณ)\nประเภทที่ดิน: (ใส่ประเภท)\nราคาประเมิน: (ใส่ราคา)\n\nหมายเหตุ: เพื่อการแสดงผล/ประกอบการชี้แจงเท่านั้น"
-        position="0 2.6 0.02"
-        align="center"
-        width="6.5"
-      ></a-text>
-    </a-entity>
-
-  </a-scene>
-
-  <script>
-    // HUD แสดง lat/lon ปัจจุบัน เพื่อดูว่า GPS ทำงานไหม
-    const hud = document.getElementById("hud");
-
-    function fmt(n) {
-      return (typeof n === "number") ? n.toFixed(7) : "—";
+      // (2) แท่งเส้น (ทำเป็นกล่องถี่ ๆ)
+      sprinkleAlongEdge(p1, p2, STEP_BEAM_M, (lat, lon, approxSegLen) => addBeamSegment(root, lat, lon, approxSegLen));
     }
 
-    // แสดงตำแหน่งทุกครั้งที่ browser ส่งมา
-    if ("geolocation" in navigator) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          hud.textContent =
-            `GPS ตำแหน่งปัจจุบัน\n` +
-            `lat: ${fmt(latitude)}\n` +
-            `lon: ${fmt(longitude)}\n` +
-            `accuracy: ${Math.round(accuracy)} m\n\n` +
-            `วิธีทดสอบ:\n` +
-            `- ไปที่พื้นที่จริงใกล้แปลง (กลางแจ้ง)\n` +
-            `- หันโทรศัพท์ช้า ๆ และเดินขยับ 2–5 เมตร\n` +
-            `- เมื่อเข้าใกล้มุม A/B/C/D จะเห็นเสาโผล่`;
-        },
-        (err) => {
-          hud.textContent =
-            `❌ GPS ใช้งานไม่ได้: ${err.message}\n` +
-            `ให้ไปที่ Settings > Privacy & Security > Location Services\n` +
-            `และอนุญาตให้ Safari/Chrome ใช้ตำแหน่ง`;
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 20000
-        }
-      );
-    } else {
-      hud.textContent = "❌ อุปกรณ์นี้ไม่รองรับ Geolocation";
-    }
-  </script>
-</body>
-</html>
+    // ป้ายกลางแปลง (คำนวณจากเฉลี่ย 4 มุม)
+    const center = {
+      lat: (corners.A.lat + corners.B.lat + corners.C.lat + corners.D.lat) / 4,
+      lon: (corners.A.lon + corners.B.lon + corners.C.lon + corners.D.lon) / 4
+    };
+    addCenterLabel(root, center.lat, center.lon);
+  });
+</script>
