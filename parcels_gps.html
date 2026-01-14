@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Land Parcels (GPS AR) - iPhone Demo</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+  <!-- AR.js (A-Frame build includes gps-camera / gps-entity-place / rotation-reader) -->
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
+
+  <style>
+    /* แถบ debug ด้านบน */
+    #hud {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      z-index: 9999;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.35;
+      border-radius: 10px;
+      pointer-events: none;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+
+<body style="margin:0; overflow:hidden;">
+  <div id="hud">กำลังรอสิทธิ์ Camera/Location...</div>
+
+  <a-scene
+    embedded
+    vr-mode-ui="enabled:false"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+  >
+    <!-- กล้องแบบ GPS + อ่านทิศ -->
+    <a-entity id="cam" gps-camera rotation-reader></a-entity>
+
+    <!-- ====== มุมแปลง (Corner Posts) ====== -->
+    <!-- A -->
+    <a-entity gps-entity-place="latitude: 14.3179166667; longitude: 101.2748333333;">
+      <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
+      <a-text value="A" position="0 3.6 0" align="center" width="8"></a-text>
+    </a-entity>
+
+    <!-- B -->
+    <a-entity gps-entity-place="latitude: 14.3180000000; longitude: 101.2749722222;">
+      <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
+      <a-text value="B" position="0 3.6 0" align="center" width="8"></a-text>
+    </a-entity>
+
+    <!-- C -->
+    <a-entity gps-entity-place="latitude: 14.3177222222; longitude: 101.2752222222;">
+      <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
+      <a-text value="C" position="0 3.6 0" align="center" width="8"></a-text>
+    </a-entity>
+
+    <!-- D -->
+    <a-entity gps-entity-place="latitude: 14.3176666667; longitude: 101.2750833333;">
+      <a-cylinder height="3.0" radius="0.18" position="0 1.5 0"></a-cylinder>
+      <a-text value="D" position="0 3.6 0" align="center" width="8"></a-text>
+    </a-entity>
+
+    <!-- ====== ป้ายข้อมูลกลางแปลง ====== -->
+    <a-entity gps-entity-place="latitude: 14.3178263889; longitude: 101.2750277778;">
+      <a-plane width="4.6" height="2.4" position="0 2.6 0"></a-plane>
+      <a-text
+        value="ข้อมูลหน่วยที่ดิน (แสดงผล)\nหน่วยที่ดิน: (ใส่รหัสของคุณ)\nประเภทที่ดิน: (ใส่ประเภท)\nราคาประเมิน: (ใส่ราคา)\n\nหมายเหตุ: เพื่อการแสดงผล/ประกอบการชี้แจงเท่านั้น"
+        position="0 2.6 0.02"
+        align="center"
+        width="6.5"
+      ></a-text>
+    </a-entity>
+
+  </a-scene>
+
+  <script>
+    // HUD แสดง lat/lon ปัจจุบัน เพื่อดูว่า GPS ทำงานไหม
+    const hud = document.getElementById("hud");
+
+    function fmt(n) {
+      return (typeof n === "number") ? n.toFixed(7) : "—";
+    }
+
+    // แสดงตำแหน่งทุกครั้งที่ browser ส่งมา
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          hud.textContent =
+            `GPS ตำแหน่งปัจจุบัน\n` +
+            `lat: ${fmt(latitude)}\n` +
+            `lon: ${fmt(longitude)}\n` +
+            `accuracy: ${Math.round(accuracy)} m\n\n` +
+            `วิธีทดสอบ:\n` +
+            `- ไปที่พื้นที่จริงใกล้แปลง (กลางแจ้ง)\n` +
+            `- หันโทรศัพท์ช้า ๆ และเดินขยับ 2–5 เมตร\n` +
+            `- เมื่อเข้าใกล้มุม A/B/C/D จะเห็นเสาโผล่`;
+        },
+        (err) => {
+          hud.textContent =
+            `❌ GPS ใช้งานไม่ได้: ${err.message}\n` +
+            `ให้ไปที่ Settings > Privacy & Security > Location Services\n` +
+            `และอนุญาตให้ Safari/Chrome ใช้ตำแหน่ง`;
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 20000
+        }
+      );
+    } else {
+      hud.textContent = "❌ อุปกรณ์นี้ไม่รองรับ Geolocation";
+    }
+  </script>
+</body>
+</html>
