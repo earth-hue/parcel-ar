@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "roads_ar_points_อำเภอเมือง",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "road_key": "61000000H009", "road_name": "หมู่บ้าน P.villar 2", "road_no": "0", "aumpher": "อำเภอเมือง", "office": "สาขาเมือง", "branch_code": "61000000", "name_short": "None", "price_new": 14500, "price_old": 4000, "width_m": 8, "pt_i": 0 }, "geometry": { "type": "Point", "coordinates": [ 100.027473826124137, 15.369368291069891 ] } },
+{ "type": "Feature", "properties": { "road_key": "61000000H009", "road_name": "หมู่บ้าน P.villar 2", "road_no": "0", "aumpher": "อำเภอเมือง", "office": "สาขาเมือง", "branch_code": "61000000", "name_short": "None", "price_new": 14500, "price_old": 4000, "width_m": 8, "pt_i": 1 }, "geometry": { "type": "Point", "coordinates": [ 100.027774795402806, 15.368604580294972 ] } }
+]
+}
