@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AR ถนนตามอำเภอ (เส้นถนน - เสถียร)</title>
+<title>AR ถนนตามอำเภอ (เส้นถนน - FIX GPS PLACE)</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
@@ -45,7 +45,7 @@
 <body>
 
 <div id="ui">
-  <b>โหมด AR ถนนตามอำเภอ (แสดงผลเป็นเส้น - เสถียร)</b><br/>
+  <b>โหมด AR ถนนตามอำเภอ (DEBUG)</b><br/>
   เลือกอำเภอ/ชุดข้อมูล:
   <br/>
   <select id="dataset">
@@ -61,7 +61,7 @@
     <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
     <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
 
-    <!-- ชุดหลุด (ถ้ามีใน data/) -->
+    <!-- ชุดหลุด (ถ้าอยู่ใน data/) -->
     <option value="roads_ar_points_หนองขาหย่าง.geojson">หนองขาหย่าง (ชุดสั้น)</option>
     <option value="roads_ar_points_หนองฉาง.geojson">หนองฉาง (ชุดสั้น)</option>
     <option value="roads_ar_points_อำเภอเมือง.geojson">อำเภอเมือง (ชุดสั้น)</option>
@@ -75,7 +75,7 @@
   <div id="msg">รออนุญาต Camera / Location…</div>
 </div>
 
-<!-- ✅ ปิด rotation-reader เพื่อกัน compass jitter -->
+<!-- ✅ ไม่ใช้ rotation-reader เพื่อลด compass jitter -->
 <a-scene
   embedded
   vr-mode-ui="enabled:false"
@@ -88,24 +88,24 @@
 
 <script>
 /* =======================
-   CONFIG (Production)
+   CONFIG
 ======================= */
-const SEG_THICK   = 0.20;    // ความหนาเส้น
-const SEG_HEIGHT  = 0.35;    // ยกเส้นให้ลอยจากพื้น (กันหาย/กันปื้น)
-const DRAW_EVERY  = 3;       // เว้นจุดเพื่อลดการทับซ้อน/ลดภาระ
-const MAX_RADIUS_M = 1200;   // แสดงเฉพาะรอบตัว
-const MAX_SEGMENTS = 800;    // จำกัดจำนวนเส้นให้เสถียรบน iPhone
-const BEARING_OFFSET = 90;   // ถ้าแนวเส้นแปลก ลอง 0 / 90 / -90
+const SEG_THICK    = 0.20;
+const SEG_HEIGHT   = 0.35;   // ยกเส้นขึ้นจากพื้น
+const DRAW_EVERY   = 3;      // เว้นจุด ลดทับซ้อน
+const MAX_RADIUS_M = 1500;   // วาดเฉพาะรอบตัว
+const MAX_SEGMENTS = 900;    // จำกัดจำนวนเส้นให้เสถียร
+const BEARING_OFFSET = 90;   // ถ้าแนวเส้นเพี้ยน ลอง 0 / 90 / -90
 
-// แสดงบรรทัด “ใกล้ถนนที่สุด” เพื่อยืนยันว่ามีข้อมูลใกล้
 const SHOW_NEAREST_INFO = true;
+const SHOW_USER_MARKER = false; // เปิดเป็น true ถ้าอยากเห็นกล่องแดงตำแหน่งผู้ใช้
 /* ======================= */
 
 const root = document.getElementById("root");
 const msg  = document.getElementById("msg");
 
 let userLat = null, userLon = null;
-let isDrawn = false; // ✅ ล็อกไม่ให้ redraw จนกดล้าง
+let isDrawn = false;
 
 // ---------- GPS ----------
 navigator.geolocation.watchPosition(
@@ -150,25 +150,49 @@ function bearingDeg(lat1, lon1, lat2, lon2){
   return (toDeg(Math.atan2(y,x))+360)%360;
 }
 
-function addSegment(lat1, lon1, lat2, lon2){
-  const midLat = (lat1+lat2)/2;
-  const midLon = (lon1+lon2)/2;
+// ✅ ทดสอบตำแหน่งผู้ใช้ (กล่องแดง)
+function addUserMarker(){
+  if (userLat === null || userLon === null) return;
+  const e = document.createElement("a-entity");
+  e.setAttribute("gps-entity-place", `latitude: ${userLat.toFixed(7)}; longitude: ${userLon.toFixed(7)};`);
 
-  const len = distMeters(lat1,lon1,lat2,lon2);
-  const brg = bearingDeg(lat1,lon1,lat2,lon2) + BEARING_OFFSET;
+  const b = document.createElement("a-box");
+  b.setAttribute("position", "0 1 0");
+  b.setAttribute("color", "red");
+  b.setAttribute("width", "0.6");
+  b.setAttribute("height", "0.6");
+  b.setAttribute("depth", "0.6");
+
+  e.appendChild(b);
+  root.appendChild(e);
+}
+
+// ✅ วาดเส้นถนน (segment)
+function addSegment(lat1, lon1, lat2, lon2){
+  const midLat = (lat1 + lat2) / 2;
+  const midLon = (lon1 + lon2) / 2;
+
+  const len = distMeters(lat1, lon1, lat2, lon2);
+  const brg = bearingDeg(lat1, lon1, lat2, lon2) + BEARING_OFFSET;
 
   const e = document.createElement("a-entity");
-  e.setAttribute("gps-entity-place", `latitude:${midLat}; longitude:${midLon}`);
+
+  // ⭐ FIX สำคัญ: ฟอร์แมตนี้ AR.js อ่านได้ชัวร์ (ไม่ซ้อนจุดเดียว)
+  e.setAttribute(
+    "gps-entity-place",
+    `latitude: ${midLat.toFixed(7)}; longitude: ${midLon.toFixed(7)};`
+  );
 
   const box = document.createElement("a-box");
   box.setAttribute("width", SEG_THICK);
   box.setAttribute("height", SEG_HEIGHT);
   box.setAttribute("depth", Math.max(1, len));
-  // ✅ ยกเส้นให้ลอยจากพื้นชัด ๆ
+
+  // ยกเส้นให้ลอยจากพื้น (กันพื้นกิน/กันปื้น)
   box.setAttribute("position", `0 ${SEG_HEIGHT} 0`);
   box.setAttribute("color", "#ffffff");
 
-  // ✅ นอนเส้นลงพื้น (กันพุ่งขึ้นฟ้า)
+  // นอนเส้นลงพื้น
   box.setAttribute("rotation", `-90 ${brg} 0`);
 
   e.appendChild(box);
@@ -202,7 +226,9 @@ async function drawFile(file){
   const feats = gj.features || [];
   msg.textContent += `\nโหลดสำเร็จ: features=${feats.length}`;
 
-  // คำนวณ “ใกล้ถนนที่สุด” จากจุดในไฟล์ (ช่วยยืนยันว่ามีข้อมูลแถวนี้)
+  if (SHOW_USER_MARKER) addUserMarker();
+
+  // DEBUG: ใกล้ถนนที่สุด
   if (SHOW_NEAREST_INFO){
     let nearest = Infinity;
     let nearestName = "";
@@ -218,6 +244,8 @@ async function drawFile(file){
     }
     if (nearest < Infinity){
       msg.textContent += `\nใกล้ถนนที่สุด: ${Math.round(nearest)} m\n${nearestName}`;
+    } else {
+      msg.textContent += `\n❌ ไม่พบ Point ในไฟล์นี้`;
     }
   }
 
