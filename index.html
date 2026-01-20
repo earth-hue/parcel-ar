@@ -299,9 +299,11 @@ async function drawFile(file){
 // Buttons
 document.getElementById("load").onclick = ()=>{
   const f = document.getElementById("dataset").value;
-  if (!f) { msg.textContent += "\n\nกรุณาเลือกอำเภอ"; return; }
+  msg.textContent += `\n\n[CLICK] load = ${f}`;
+  if (!f) { msg.textContent += "\nกรุณาเลือกอำเภอ"; return; }
   drawFile(f);
 };
+
 document.getElementById("clear").onclick = ()=>{
   clearScene();
   msg.textContent += "\n\nล้างแล้ว";
