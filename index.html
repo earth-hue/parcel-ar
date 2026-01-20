@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AR ถนนตามอำเภอ (เส้นถนน - FIX GPS PLACE)</title>
+<title>AR ถนนตามอำเภอ (เส้นถนน - Stable+Debug)</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
@@ -26,7 +26,7 @@
     position: fixed;
     top: 10px; left: 10px; right: 10px;
     z-index: 9999;
-    background: rgba(0,0,0,.70);
+    background: rgba(0,0,0,.72);
     color: #fff;
     padding: 10px 12px;
     border-radius: 12px;
@@ -39,19 +39,20 @@
     margin-top: 6px;
   }
   #msg { margin-top: 6px; white-space: pre-line; }
+  #tips { opacity: .9; font-size: 12px; margin-top: 6px; }
 </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <b>โหมด AR ถนนตามอำเภอ (DEBUG)</b><br/>
+  <b>โหมด AR ถนนตามอำเภอ (เส้นถนน - เสถียร)</b><br/>
   เลือกอำเภอ/ชุดข้อมูล:
   <br/>
   <select id="dataset">
     <option value="">-- เลือก --</option>
 
-    <!-- อำเภอหลัก (ตามไฟล์คุณ) -->
+    <!-- อำเภอหลัก -->
     <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
     <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
     <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
@@ -61,7 +62,7 @@
     <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
     <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
 
-    <!-- ชุดหลุด (ถ้าอยู่ใน data/) -->
+    <!-- ชุดหลุด/พิเศษ (ถ้ามีใน data/) -->
     <option value="roads_ar_points_หนองขาหย่าง.geojson">หนองขาหย่าง (ชุดสั้น)</option>
     <option value="roads_ar_points_หนองฉาง.geojson">หนองฉาง (ชุดสั้น)</option>
     <option value="roads_ar_points_อำเภอเมือง.geojson">อำเภอเมือง (ชุดสั้น)</option>
@@ -73,9 +74,13 @@
   <button id="clear">ล้าง</button>
 
   <div id="msg">รออนุญาต Camera / Location…</div>
+  <div id="tips">
+    * แนะนำเปิดแบบกันแคช: /?v=1 แล้วเปลี่ยนเลขทุกครั้งที่แก้ไฟล์<br/>
+    * ถ้าไม่เห็นเส้น ดูค่า NEAREST_POINT และ RESULT
+  </div>
 </div>
 
-<!-- ✅ ไม่ใช้ rotation-reader เพื่อลด compass jitter -->
+<!-- ✅ ไม่ใช้ rotation-reader (ลด compass jitter) -->
 <a-scene
   embedded
   vr-mode-ui="enabled:false"
@@ -88,24 +93,22 @@
 
 <script>
 /* =======================
-   CONFIG
+   CONFIG (จูนเพื่อ iPhone)
 ======================= */
-const SEG_THICK    = 0.20;
-const SEG_HEIGHT   = 0.35;   // ยกเส้นขึ้นจากพื้น
+const SEG_THICK    = 0.18;   // ความหนาเส้น
+const SEG_HEIGHT   = 0.28;   // ยกเส้นให้ลอยจากพื้น (กันหาย/กันพื้นกิน)
 const DRAW_EVERY   = 3;      // เว้นจุด ลดทับซ้อน
-const MAX_RADIUS_M = 1500;   // วาดเฉพาะรอบตัว
+const MAX_RADIUS_M = 1500;   // วาดเฉพาะรอบตัว (เดโม่ผู้บริหาร)
 const MAX_SEGMENTS = 900;    // จำกัดจำนวนเส้นให้เสถียร
 const BEARING_OFFSET = 90;   // ถ้าแนวเส้นเพี้ยน ลอง 0 / 90 / -90
 
-const SHOW_NEAREST_INFO = true;
-const SHOW_USER_MARKER = false; // เปิดเป็น true ถ้าอยากเห็นกล่องแดงตำแหน่งผู้ใช้
+const SHOW_NEAREST_INFO = true; // แสดงระยะจุดใกล้สุดทุกครั้ง
 /* ======================= */
 
 const root = document.getElementById("root");
 const msg  = document.getElementById("msg");
 
 let userLat = null, userLon = null;
-let isDrawn = false;
 
 // ---------- GPS ----------
 navigator.geolocation.watchPosition(
@@ -150,24 +153,7 @@ function bearingDeg(lat1, lon1, lat2, lon2){
   return (toDeg(Math.atan2(y,x))+360)%360;
 }
 
-// ✅ ทดสอบตำแหน่งผู้ใช้ (กล่องแดง)
-function addUserMarker(){
-  if (userLat === null || userLon === null) return;
-  const e = document.createElement("a-entity");
-  e.setAttribute("gps-entity-place", `latitude: ${userLat.toFixed(7)}; longitude: ${userLon.toFixed(7)};`);
-
-  const b = document.createElement("a-box");
-  b.setAttribute("position", "0 1 0");
-  b.setAttribute("color", "red");
-  b.setAttribute("width", "0.6");
-  b.setAttribute("height", "0.6");
-  b.setAttribute("depth", "0.6");
-
-  e.appendChild(b);
-  root.appendChild(e);
-}
-
-// ✅ วาดเส้นถนน (segment)
+// ✅ วาดเส้นถนน (segment) — ฟอร์แมต gps-entity-place ที่ AR.js อ่านได้ชัวร์
 function addSegment(lat1, lon1, lat2, lon2){
   const midLat = (lat1 + lat2) / 2;
   const midLon = (lon1 + lon2) / 2;
@@ -176,8 +162,6 @@ function addSegment(lat1, lon1, lat2, lon2){
   const brg = bearingDeg(lat1, lon1, lat2, lon2) + BEARING_OFFSET;
 
   const e = document.createElement("a-entity");
-
-  // ⭐ FIX สำคัญ: ฟอร์แมตนี้ AR.js อ่านได้ชัวร์ (ไม่ซ้อนจุดเดียว)
   e.setAttribute(
     "gps-entity-place",
     `latitude: ${midLat.toFixed(7)}; longitude: ${midLon.toFixed(7)};`
@@ -187,9 +171,7 @@ function addSegment(lat1, lon1, lat2, lon2){
   box.setAttribute("width", SEG_THICK);
   box.setAttribute("height", SEG_HEIGHT);
   box.setAttribute("depth", Math.max(1, len));
-
-  // ยกเส้นให้ลอยจากพื้น (กันพื้นกิน/กันปื้น)
-  box.setAttribute("position", `0 ${SEG_HEIGHT} 0`);
+  box.setAttribute("position", `0 ${SEG_HEIGHT} 0`);   // ยกขึ้นจากพื้น
   box.setAttribute("color", "#ffffff");
 
   // นอนเส้นลงพื้น
@@ -201,11 +183,6 @@ function addSegment(lat1, lon1, lat2, lon2){
 
 // ---------- Load + Draw ----------
 async function drawFile(file){
-  if (isDrawn){
-    msg.textContent += `\n\n(เส้นถูกวาดแล้ว) ถ้าจะวาดใหม่ให้กด “ล้าง” ก่อน`;
-    return;
-  }
-
   clearScene();
 
   if (userLat === null || userLon === null){
@@ -226,9 +203,7 @@ async function drawFile(file){
   const feats = gj.features || [];
   msg.textContent += `\nโหลดสำเร็จ: features=${feats.length}`;
 
-  if (SHOW_USER_MARKER) addUserMarker();
-
-  // DEBUG: ใกล้ถนนที่สุด
+  // DEBUG: หา "จุดใกล้สุด"
   if (SHOW_NEAREST_INFO){
     let nearest = Infinity;
     let nearestName = "";
@@ -242,11 +217,8 @@ async function drawFile(file){
         nearestName = p.road_name || p.road_key || "";
       }
     }
-    if (nearest < Infinity){
-      msg.textContent += `\nใกล้ถนนที่สุด: ${Math.round(nearest)} m\n${nearestName}`;
-    } else {
-      msg.textContent += `\n❌ ไม่พบ Point ในไฟล์นี้`;
-    }
+    msg.textContent += `\nNEAREST_POINT=${(nearest<Infinity)?Math.round(nearest):"NA"} m`;
+    if (nearestName) msg.textContent += `\n${nearestName}`;
   }
 
   // group by road_key แล้วเรียง pt_i
@@ -284,20 +256,23 @@ async function drawFile(file){
     }
   }
 
-  msg.textContent += `\nวาดเส้น: ${count} segments\nroads in file: ${roads}\nรัศมีแสดงผล: ${MAX_RADIUS_M} m`;
-  isDrawn = true;
+  msg.textContent += `\nRESULT: segments=${count}\nroads in file=${roads}\nRADIUS=${MAX_RADIUS_M}m  LIMIT=${MAX_SEGMENTS}  DRAW_EVERY=${DRAW_EVERY}`;
 }
 
 // ---------- Buttons ----------
 document.getElementById("load").onclick = ()=>{
   const f = document.getElementById("dataset").value;
   if (!f) { msg.textContent += "\n\nกรุณาเลือกอำเภอ"; return; }
+
+  // ✅ สำคัญ: วาดใหม่ได้ทุกครั้ง (ไม่ค้างจากรอบก่อน)
+  clearScene();
+
+  msg.textContent += `\n\n[CLICK LOAD] ${f}`;
   drawFile(f);
 };
 
 document.getElementById("clear").onclick = ()=>{
   clearScene();
-  isDrawn = false;
   msg.textContent += "\n\nล้างแล้ว";
 };
 </script>
