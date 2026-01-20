@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AR Road Viewer - Stable Version</title>
+    <title>AR Road Viewer - Auto Simulation</title>
 
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js" crossorigin="anonymous"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/eruda" crossorigin="anonymous"></script>
@@ -13,56 +13,52 @@
 
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(0,0,0,0.85); color: #fff; padding: 15px; border-bottom: 2px solid #3498db; }
-        select, button { font-size: 16px; padding: 10px; margin-top: 8px; width: 100%; border-radius: 8px; border: none; }
-        button { background: #3498db; color: white; font-weight: bold; }
-        #msg { margin-top: 10px; white-space: pre-line; color: #f1c40f; font-family: monospace; font-size: 12px; }
-        .sim-btn { background: #e67e22; margin-top: 5px; }
+        #ui { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: rgba(0,0,0,0.8); color: #fff; padding: 15px; border-bottom: 2px solid #27ae60; }
+        select, button { font-size: 14px; padding: 10px; margin-top: 5px; width: 100%; border-radius: 6px; border: none; }
+        button { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
+        #msg { margin-top: 8px; white-space: pre-line; color: #00ff00; font-family: monospace; font-size: 11px; }
     </style>
 </head>
 
 <body>
 <div id="ui">
-    <b>📍 ระบบ AR ถนน (เวอร์ชันสมบูรณ์)</b>
+    <b>📍 ระบบ AR ถนน (โหมดจำลองตำแหน่งอัตโนมัติ)</b><br/>
     <select id="dataset">
-        <option value="">-- เลือกอำเภอ --</option>
-        <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
+        <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี (ค่าเริ่มต้น)</option>
         <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
         <option value="roads_ar_points_อำเภอทัพทัน.geojson">อำเภอทัพทัน</option>
-        <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
+        <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
     </select>
-    <button id="load">🚀 แสดงผลถนน AR</button>
-    <button class="sim-btn" id="simulate">🏠 จำลองตำแหน่ง (อุทัยธานี)</button>
-    <div id="msg">รอสัญญาณ GPS...</div>
+    <button id="load">🚀 โหลดข้อมูลอำเภอที่เลือก</button>
+    <div id="msg">กำลังเตรียมระบบจำลองพิกัด...</div>
 </div>
 
-<a-scene embedded vr-mode-ui="enabled:false" arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;">
+<a-scene
+    embedded
+    vr-mode-ui="enabled:false"
+    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+>
     <a-box position="0 1.5 -5" material="color: purple; opacity: 0.8" scale="0.5 0.5 0.5"></a-box>
     
-    <a-entity id="main-camera" gps-camera="enableHighAccuracy: true; minDistance: 5;" rotation-reader></a-entity>
+    <a-entity id="main-camera" 
+              gps-camera="simulateLatitude: 15.36257; simulateLongitude: 100.01436;" 
+              rotation-reader>
+    </a-entity>
+    
     <a-entity id="root"></a-entity>
 </a-scene>
 
 <script>
-// ปรับแต่งเพื่อแก้ปัญหารูปภาพบิดเบี้ยว
-const ROAD_WIDTH = 0.5;   // ความกว้างเส้นถนน (เมตร)
-const ROAD_HEIGHT = 0.05; // ความสูงจากพื้น (ให้ราบไปกับถนน)
-const MAX_DRAW_DIST = 1000; // รัศมี 1 กม.
+const ROAD_WIDTH = 0.6;   
+const ROAD_HEIGHT = 0.1;  
+const MAX_DRAW_DIST = 1500; 
 
 const root = document.getElementById("root");
 const msg = document.getElementById("msg");
-let userLat = null, userLon = null;
+let simLat = 15.36257, simLon = 100.01436;
 
-// ติดตามตำแหน่ง GPS
-navigator.geolocation.watchPosition((pos) => {
-    userLat = pos.coords.latitude;
-    userLon = pos.coords.longitude;
-    const acc = Math.round(pos.coords.accuracy);
-    msg.textContent = `พิกัดปัจจุบัน: ${userLat.toFixed(5)}, ${userLon.toFixed(5)}\nความแม่นยำ: ±${acc}m`;
-    if (acc > 30) msg.textContent += "\n⚠️ สัญญาณต่ำ (พิกัดอาจแกว่ง)";
-}, (err) => {
-    msg.textContent = `❌ GPS Error: ${err.message}`;
-}, { enableHighAccuracy: true });
+// แสดงสถานะจำลองพิกัด
+msg.textContent = `⚠️ โหมดจำลองพิกัด: อุทัยธานี\nพิกัด: ${simLat}, ${simLon}\n(กรุณากดปุ่มโหลดข้อมูล)`;
 
 function distMeters(lat1, lon1, lat2, lon2) {
     const R = 6371000;
@@ -87,17 +83,15 @@ function addRoadSegment(lat1, lon1, lat2, lon2) {
     const length = distMeters(lat1, lon1, lat2, lon2);
     const angle = bearingDeg(lat1, lon1, lat2, lon2);
 
-    // ป้องกันการวาดเส้นที่ยาวผิดปกติจากความคลาดเคลื่อน GPS
     if (length > 200) return; 
 
     const entity = document.createElement("a-entity");
     entity.setAttribute("gps-entity-place", `latitude: ${midLat.toFixed(7)}; longitude: ${midLon.toFixed(7)};`);
 
-    // ใช้ a-plane และวางให้นอนราบไปกับพื้น (-90 องศาที่แกน X)
     const plane = document.createElement("a-plane");
     plane.setAttribute("width", ROAD_WIDTH);
     plane.setAttribute("height", length);
-    plane.setAttribute("color", "#f1c40f"); // สีเหลืองทอง
+    plane.setAttribute("color", "#f1c40f");
     plane.setAttribute("rotation", "-90 " + angle + " 0");
     plane.setAttribute("position", `0 ${ROAD_HEIGHT} 0`);
     plane.setAttribute("material", "shader: flat; side: double;");
@@ -107,57 +101,51 @@ function addRoadSegment(lat1, lon1, lat2, lon2) {
 }
 
 async function loadData(filename) {
-    if (!userLat) { alert("กรุณารอ GPS หรือกดจำลองตำแหน่ง"); return; }
     root.innerHTML = ""; 
-    msg.textContent = "กำลังโหลดข้อมูล...";
+    msg.textContent = `กำลังดึงข้อมูลจาก ./data/${filename}...`;
 
     try {
         const url = `./data/${encodeURIComponent(filename)}`;
-        const res = await fetch(url, { mode: 'no-cors' }); // ลองโหลดแบบไม่ติด cors
+        const res = await fetch(url);
         
-        // ถ้าโหลดปกติไม่ได้ ให้ลองโหลดแบบธรรมดา
-        const finalRes = await fetch(url);
-        if (!finalRes.ok) throw new Error("หาไฟล์ไม่เจอในโฟลเดอร์ /data");
+        if (!res.ok) throw new Error(`ไม่พบไฟล์ที่ ./data/${filename}`);
         
-        const data = await finalRes.json();
+        const data = await res.json();
         const features = data.features || [];
         
         const byRoad = new Map();
         features.forEach(f => {
-            const [lon, lat] = f.geometry.coordinates;
-            const p = f.properties || {};
-            const key = p.road_key || p.road_name || "default";
-            if (!byRoad.has(key)) byRoad.set(key, []);
-            byRoad.get(key).push({lat, lon, pt_i: Number(p.pt_i || 0)});
+            if (f.geometry && f.geometry.coordinates) {
+                const [lon, lat] = f.geometry.coordinates;
+                const p = f.properties || {};
+                const key = p.road_key || p.road_name || "default";
+                if (!byRoad.has(key)) byRoad.set(key, []);
+                byRoad.get(key).push({lat, lon, pt_i: Number(p.pt_i || 0)});
+            }
         });
 
         let count = 0;
         byRoad.forEach(pts => {
             pts.sort((a, b) => a.pt_i - b.pt_i);
             for (let i = 0; i < pts.length - 1; i++) {
-                const d = distMeters(userLat, userLon, pts[i].lat, pts[i].lon);
+                // คำนวณระยะห่างจากพิกัดจำลอง
+                const d = distMeters(simLat, simLon, pts[i].lat, pts[i].lon);
                 if (d < MAX_DRAW_DIST) {
                     addRoadSegment(pts[i].lat, pts[i].lon, pts[i+1].lat, pts[i+1].lon);
                     count++;
                 }
             }
         });
-        msg.textContent = `✅ สำเร็จ! แสดงผลถนน ${count} ช่วง`;
+        msg.textContent = `✅ โหลดสำเร็จ: วาดถนนแล้ว ${count} ช่วง\nรัศมีการค้นหา: ${MAX_DRAW_DIST} เมตร`;
     } catch (err) {
-        msg.textContent = `❌ Error: ${err.message}\n(ตรวจสอบชื่อไฟล์และโฟลเดอร์ /data)`;
+        msg.textContent = `❌ Error: ${err.message}`;
+        console.error("Fetch Error:", err);
     }
 }
 
 document.getElementById("load").onclick = () => {
     const f = document.getElementById("dataset").value;
     if (f) loadData(f);
-};
-
-document.getElementById("simulate").onclick = () => {
-    userLat = 15.36257; userLon = 100.01436;
-    const cam = document.getElementById("main-camera");
-    cam.setAttribute("gps-camera", `simulateLatitude: ${userLat}; simulateLongitude: ${userLon};`);
-    msg.textContent = "⚠️ โหมดจำลองตำแหน่ง: อำเภอเมืองอุทัยธานี";
 };
 </script>
 </body>
