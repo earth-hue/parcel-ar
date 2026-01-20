@@ -1,281 +1,170 @@
 <!doctype html>
 <html lang="th">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AR ถนนตามอำเภอ (เส้นถนน - Stable+Debug)</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AR Road Viewer (Data Folder Version)</title>
 
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <script>eruda.init();</script>
 
-<style>
-  html, body {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-    background: #000;
-    font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
-  }
-  a-scene {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 1;
-  }
-  #ui {
-    position: fixed;
-    top: 10px; left: 10px; right: 10px;
-    z-index: 9999;
-    background: rgba(0,0,0,.72);
-    color: #fff;
-    padding: 10px 12px;
-    border-radius: 12px;
-    font-size: 14px;
-    line-height: 1.4;
-  }
-  #ui select, #ui button {
-    font-size: 14px;
-    padding: 6px 10px;
-    margin-top: 6px;
-  }
-  #msg { margin-top: 6px; white-space: pre-line; }
-  #tips { opacity: .9; font-size: 12px; margin-top: 6px; }
-</style>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        #ui { position: fixed; top: 10px; left: 10px; right: 10px; z-index: 9999; background: rgba(0,0,0,.85); color: #fff; padding: 15px; border-radius: 12px; font-size: 14px; }
+        select, button { font-size: 14px; padding: 8px; margin-top: 8px; width: 100%; border-radius: 5px; border: none; }
+        button { background: #3498db; color: white; font-weight: bold; cursor: pointer; }
+        #msg { margin-top: 10px; white-space: pre-line; color: #00ff00; font-family: monospace; font-size: 11px; }
+        .sim-btn { background: #e67e22; margin-top: 5px; }
+    </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <b>โหมด AR ถนนตามอำเภอ (เส้นถนน - เสถียร)</b><br/>
-  เลือกอำเภอ/ชุดข้อมูล:
-  <br/>
-  <select id="dataset">
-    <option value="">-- เลือก --</option>
-
-    <!-- อำเภอหลัก -->
-    <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
-    <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
-    <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
-    <option value="roads_ar_points_อำเภอลานสัก.geojson">อำเภอลานสัก</option>
-    <option value="roads_ar_points_อำเภอทัพทัน.geojson">อำเภอทัพทัน</option>
-    <option value="roads_ar_points_อำเภอสว่างอารมณ์.geojson">อำเภอสว่างอารมณ์</option>
-    <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
-    <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
-
-    <!-- ชุดหลุด/พิเศษ (ถ้ามีใน data/) -->
-    <option value="roads_ar_points_หนองขาหย่าง.geojson">หนองขาหย่าง (ชุดสั้น)</option>
-    <option value="roads_ar_points_หนองฉาง.geojson">หนองฉาง (ชุดสั้น)</option>
-    <option value="roads_ar_points_อำเภอเมือง.geojson">อำเภอเมือง (ชุดสั้น)</option>
-    <option value="roads_ar_points_เมือง.geojson">เมือง (ชุดสั้น)</option>
-    <option value="roads_ar_points_จังหวัดสุพรรณบุรี.geojson">จังหวัดสุพรรณบุรี (ชุดหลุด)</option>
-  </select>
-  <br/>
-  <button id="load">โหลดถนน</button>
-  <button id="clear">ล้าง</button>
-
-  <div id="msg">รออนุญาต Camera / Location…</div>
-  <div id="tips">
-    * แนะนำเปิดแบบกันแคช: /?v=1 แล้วเปลี่ยนเลขทุกครั้งที่แก้ไฟล์<br/>
-    * ถ้าไม่เห็นเส้น ดูค่า NEAREST_POINT และ RESULT
-  </div>
+    <b>📍 ระบบ AR ถนน (Data Folder)</b><br/>
+    เลือกไฟล์ในโฟลเดอร์ /data:
+    <select id="dataset">
+        <option value="">-- กรุณาเลือก --</option>
+        <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
+        <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
+        <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
+        <option value="roads_ar_points_อำเภอลานสัก.geojson">อำเภอลานสัก</option>
+        <option value="roads_ar_points_อำเภอทัพทัน.geojson">อำเภอทัพทัน</option>
+        <option value="roads_ar_points_อำเภอสว่างอารมณ์.geojson">อำเภอสว่างอารมณ์</option>
+        <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
+        <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
+    </select>
+    <button id="load">🚀 โหลดข้อมูลถนน</button>
+    <button class="sim-btn" id="simulate">🏠 จำลองตำแหน่ง (อุทัยธานี)</button>
+    <div id="msg">รอสัญญาณ GPS...</div>
 </div>
 
-<!-- ✅ ไม่ใช้ rotation-reader (ลด compass jitter) -->
 <a-scene
-  embedded
-  vr-mode-ui="enabled:false"
-  device-orientation-permission-ui="enabled: true"
-  arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+    embedded
+    vr-mode-ui="enabled:false"
+    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
 >
-  <a-entity gps-camera></a-entity>
-  <a-entity id="root"></a-entity>
+    <a-box position="0 1.6 -5" color="purple" scale="0.5 0.5 0.5"></a-box>
+    
+    <a-entity id="main-camera" gps-camera rotation-reader></a-entity>
+    <a-entity id="root"></a-entity>
 </a-scene>
 
 <script>
-/* =======================
-   CONFIG (จูนเพื่อ iPhone)
-======================= */
-const SEG_THICK    = 0.18;   // ความหนาเส้น
-const SEG_HEIGHT   = 0.28;   // ยกเส้นให้ลอยจากพื้น (กันหาย/กันพื้นกิน)
-const DRAW_EVERY   = 3;      // เว้นจุด ลดทับซ้อน
-const MAX_RADIUS_M = 1500;   // วาดเฉพาะรอบตัว (เดโม่ผู้บริหาร)
-const MAX_SEGMENTS = 900;    // จำกัดจำนวนเส้นให้เสถียร
-const BEARING_OFFSET = 90;   // ถ้าแนวเส้นเพี้ยน ลอง 0 / 90 / -90
-
-const SHOW_NEAREST_INFO = true; // แสดงระยะจุดใกล้สุดทุกครั้ง
-/* ======================= */
+/* CONFIG */
+const SEG_THICK = 0.6;    
+const SEG_HEIGHT = 0.3;   
+const MAX_RADIUS_M = 3000; 
 
 const root = document.getElementById("root");
-const msg  = document.getElementById("msg");
-
+const msg = document.getElementById("msg");
 let userLat = null, userLon = null;
 
-// ---------- GPS ----------
-navigator.geolocation.watchPosition(
-  (pos)=>{
+// GPS Tracking
+navigator.geolocation.watchPosition((pos) => {
     userLat = pos.coords.latitude;
     userLon = pos.coords.longitude;
-    msg.textContent =
-      `GPS พร้อม\nlat: ${userLat.toFixed(6)}\nlon: ${userLon.toFixed(6)}\naccuracy: ${Math.round(pos.coords.accuracy)} m\n` +
-      `แนะนำ: กลางแจ้ง + Precise Location`;
-  },
-  (err)=>{
-    msg.textContent =
-      `❌ GPS ใช้งานไม่ได้\n${err.message}\n` +
-      `ไปที่ Settings > Location Services > Safari > Precise Location`;
-  },
-  { enableHighAccuracy:true, maximumAge:0, timeout:20000 }
-);
+    msg.textContent = `GPS: ${userLat.toFixed(5)}, ${userLon.toFixed(5)} (±${Math.round(pos.coords.accuracy)}m)`;
+}, (err) => {
+    msg.textContent = `❌ GPS Error: ${err.message}`;
+}, { enableHighAccuracy: true });
 
-// ---------- Utils ----------
-function clearScene(){
-  while (root.firstChild) root.removeChild(root.firstChild);
+function distMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function distMeters(lat1, lon1, lat2, lon2){
-  const R = 6371000;
-  const toRad = d => d*Math.PI/180;
-  const dLat = toRad(lat2-lat1);
-  const dLon = toRad(lon2-lon1);
-  const a =
-    Math.sin(dLat/2)**2 +
-    Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
+function bearingDeg(lat1, lon1, lat2, lon2) {
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+    const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(toRad(lon2-lon1));
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-function bearingDeg(lat1, lon1, lat2, lon2){
-  const toRad = d => d*Math.PI/180;
-  const toDeg = r => r*180/Math.PI;
-  const y = Math.sin(toRad(lon2-lon1))*Math.cos(toRad(lat2));
-  const x =
-    Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
-    Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
-  return (toDeg(Math.atan2(y,x))+360)%360;
+function addSegment(lat1, lon1, lat2, lon2) {
+    const midLat = (lat1 + lat2) / 2;
+    const midLon = (lon1 + lon2) / 2;
+    const len = distMeters(lat1, lon1, lat2, lon2);
+    const brg = bearingDeg(lat1, lon1, lat2, lon2);
+
+    const container = document.createElement("a-entity");
+    container.setAttribute("gps-entity-place", `latitude: ${midLat.toFixed(7)}; longitude: ${midLon.toFixed(7)};`);
+
+    const line = document.createElement("a-box");
+    line.setAttribute("width", SEG_THICK);
+    line.setAttribute("height", 0.1); 
+    line.setAttribute("depth", len);
+    line.setAttribute("position", `0 ${SEG_HEIGHT} 0`);
+    line.setAttribute("rotation", `0 ${brg} 0`);
+    line.setAttribute("color", "#F1C40F"); // สีเหลืองทองเพื่อให้ตัดกับถนนสีดำ
+
+    container.appendChild(line);
+    root.appendChild(container);
 }
 
-// ✅ วาดเส้นถนน (segment) — ฟอร์แมต gps-entity-place ที่ AR.js อ่านได้ชัวร์
-function addSegment(lat1, lon1, lat2, lon2){
-  const midLat = (lat1 + lat2) / 2;
-  const midLon = (lon1 + lon2) / 2;
+async function loadData(filename) {
+    if (!userLat) { alert("รอ GPS หรือกดปุ่มจำลองพิกัดก่อนครับ"); return; }
+    
+    root.innerHTML = ""; 
+    msg.textContent = `กำลังโหลด: ./data/${filename}`;
 
-  const len = distMeters(lat1, lon1, lat2, lon2);
-  const brg = bearingDeg(lat1, lon1, lat2, lon2) + BEARING_OFFSET;
+    try {
+        // เปลี่ยนกลับมาใช้ path ./data/ พร้อมจัดการชื่อไฟล์ภาษาไทย
+        const url = `./data/${encodeURIComponent(filename)}`;
+        const res = await fetch(url);
+        
+        if (!res.ok) throw new Error(`ไม่พบไฟล์ที่ ./data/${filename} (HTTP ${res.status})`);
+        
+        const data = await res.json();
+        const feats = data.features || [];
+        
+        const byRoad = new Map();
+        feats.forEach(f => {
+            const [lon, lat] = f.geometry.coordinates;
+            const p = f.properties || {};
+            const key = p.road_key || p.road_name || "road";
+            if (!byRoad.has(key)) byRoad.set(key, []);
+            byRoad.get(key).push({lat, lon, pt_i: Number(p.pt_i || 0)});
+        });
 
-  const e = document.createElement("a-entity");
-  e.setAttribute(
-    "gps-entity-place",
-    `latitude: ${midLat.toFixed(7)}; longitude: ${midLon.toFixed(7)};`
-  );
+        let count = 0;
+        byRoad.forEach(pts => {
+            pts.sort((a, b) => a.pt_i - b.pt_i);
+            for (let i = 0; i < pts.length - 1; i++) {
+                const d = distMeters(userLat, userLon, pts[i].lat, pts[i].lon);
+                if (d < MAX_RADIUS_M) {
+                    addSegment(pts[i].lat, pts[i].lon, pts[i+1].lat, pts[i+1].lon);
+                    count++;
+                }
+            }
+        });
 
-  const box = document.createElement("a-box");
-  box.setAttribute("width", SEG_THICK);
-  box.setAttribute("height", SEG_HEIGHT);
-  box.setAttribute("depth", Math.max(1, len));
-  box.setAttribute("position", `0 ${SEG_HEIGHT} 0`);   // ยกขึ้นจากพื้น
-  box.setAttribute("color", "#ffffff");
-
-  // นอนเส้นลงพื้น
-  box.setAttribute("rotation", `-90 ${brg} 0`);
-
-  e.appendChild(box);
-  root.appendChild(e);
-}
-
-// ---------- Load + Draw ----------
-async function drawFile(file){
-  clearScene();
-
-  if (userLat === null || userLon === null){
-    msg.textContent += "\n\nรอ GPS ก่อน (ยังไม่รู้ตำแหน่งปัจจุบัน)";
-    return;
-  }
-
-  const url = `./data/${file}`;
-  msg.textContent += `\n\nกำลังโหลด: ${url}`;
-
-  const res = await fetch(url);
-  if (!res.ok){
-    msg.textContent += `\n\n❌ โหลดไฟล์ไม่สำเร็จ (HTTP ${res.status})\nตรวจว่าไฟล์อยู่ใน data/ และชื่อไฟล์ตรง`;
-    return;
-  }
-
-  const gj = await res.json();
-  const feats = gj.features || [];
-  msg.textContent += `\nโหลดสำเร็จ: features=${feats.length}`;
-
-  // DEBUG: หา "จุดใกล้สุด"
-  if (SHOW_NEAREST_INFO){
-    let nearest = Infinity;
-    let nearestName = "";
-    for (const f of feats){
-      if (!f.geometry || f.geometry.type !== "Point") continue;
-      const [lon, lat] = f.geometry.coordinates;
-      const p = f.properties || {};
-      const d = distMeters(userLat, userLon, lat, lon);
-      if (d < nearest){
-        nearest = d;
-        nearestName = p.road_name || p.road_key || "";
-      }
+        msg.textContent = `✅ โหลดสำเร็จ: ${count} segments\nใช้พิกัดจากไฟล์ใน /data/`;
+    } catch (err) {
+        msg.textContent = `❌ Error: ${err.message}`;
+        console.error(err);
     }
-    msg.textContent += `\nNEAREST_POINT=${(nearest<Infinity)?Math.round(nearest):"NA"} m`;
-    if (nearestName) msg.textContent += `\n${nearestName}`;
-  }
-
-  // group by road_key แล้วเรียง pt_i
-  const byRoad = new Map();
-  for (const f of feats){
-    if (!f.geometry || f.geometry.type !== "Point") continue;
-    const [lon, lat] = f.geometry.coordinates;
-    const p = f.properties || {};
-    const key = p.road_key || p.road_name || "road";
-    const pt_i = Number(p.pt_i ?? 0);
-    if (!byRoad.has(key)) byRoad.set(key, []);
-    byRoad.get(key).push({lat, lon, pt_i});
-  }
-
-  let count = 0;
-  let roads = 0;
-
-  for (const pts of byRoad.values()){
-    roads++;
-    pts.sort((a,b)=>a.pt_i - b.pt_i);
-
-    for (let i=0; i<pts.length - DRAW_EVERY; i += DRAW_EVERY){
-      if (count >= MAX_SEGMENTS) break;
-
-      const a = pts[i], b = pts[i + DRAW_EVERY];
-
-      // วาดเฉพาะรอบตัว
-      const midLat = (a.lat + b.lat) / 2;
-      const midLon = (a.lon + b.lon) / 2;
-      const d = distMeters(userLat, userLon, midLat, midLon);
-      if (d > MAX_RADIUS_M) continue;
-
-      addSegment(a.lat, a.lon, b.lat, b.lon);
-      count++;
-    }
-  }
-
-  msg.textContent += `\nRESULT: segments=${count}\nroads in file=${roads}\nRADIUS=${MAX_RADIUS_M}m  LIMIT=${MAX_SEGMENTS}  DRAW_EVERY=${DRAW_EVERY}`;
 }
 
-// ---------- Buttons ----------
-document.getElementById("load").onclick = ()=>{
-  const f = document.getElementById("dataset").value;
-  if (!f) { msg.textContent += "\n\nกรุณาเลือกอำเภอ"; return; }
-
-  // ✅ สำคัญ: วาดใหม่ได้ทุกครั้ง (ไม่ค้างจากรอบก่อน)
-  clearScene();
-
-  msg.textContent += `\n\n[CLICK LOAD] ${f}`;
-  drawFile(f);
+document.getElementById("load").onclick = () => {
+    const f = document.getElementById("dataset").value;
+    if (f) loadData(f);
 };
 
-document.getElementById("clear").onclick = ()=>{
-  clearScene();
-  msg.textContent += "\n\nล้างแล้ว";
+document.getElementById("simulate").onclick = () => {
+    userLat = 15.36257;
+    userLon = 100.01436;
+    const cam = document.getElementById("main-camera");
+    cam.setAttribute("gps-camera", `simulateLatitude: ${userLat}; simulateLongitude: ${userLon};`);
+    msg.textContent = "⚠️ จำลองตำแหน่งที่: เมืองอุทัยธานี\nพร้อมโหลดไฟล์จาก ./data/";
 };
 </script>
-
 </body>
 </html>
