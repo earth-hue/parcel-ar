@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AR ถนนตามอำเภอ (DEBUG)</title>
+<title>AR ถนนตามอำเภอ (เส้นถนน - เสถียร)</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
@@ -45,13 +45,13 @@
 <body>
 
 <div id="ui">
-  <b>โหมด AR ถนนตามอำเภอ (DEBUG)</b><br/>
+  <b>โหมด AR ถนนตามอำเภอ (แสดงผลเป็นเส้น - เสถียร)</b><br/>
   เลือกอำเภอ/ชุดข้อมูล:
   <br/>
   <select id="dataset">
     <option value="">-- เลือก --</option>
 
-    <!-- กลุ่มหลัก -->
+    <!-- อำเภอหลัก (ตามไฟล์คุณ) -->
     <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
     <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
     <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
@@ -61,7 +61,7 @@
     <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
     <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
 
-    <!-- ชุดหลุด/พิเศษ -->
+    <!-- ชุดหลุด (ถ้ามีใน data/) -->
     <option value="roads_ar_points_หนองขาหย่าง.geojson">หนองขาหย่าง (ชุดสั้น)</option>
     <option value="roads_ar_points_หนองฉาง.geojson">หนองฉาง (ชุดสั้น)</option>
     <option value="roads_ar_points_อำเภอเมือง.geojson">อำเภอเมือง (ชุดสั้น)</option>
@@ -75,48 +75,37 @@
   <div id="msg">รออนุญาต Camera / Location…</div>
 </div>
 
+<!-- ✅ ปิด rotation-reader เพื่อกัน compass jitter -->
 <a-scene
   embedded
   vr-mode-ui="enabled:false"
   device-orientation-permission-ui="enabled: true"
   arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
 >
-  <a-entity gps-camera rotation-reader></a-entity>
+  <a-entity gps-camera></a-entity>
   <a-entity id="root"></a-entity>
 </a-scene>
 
 <script>
 /* =======================
-   CONFIG (DEBUG MODE)
-   ตั้งให้ "เห็นแน่" ก่อน
+   CONFIG (Production)
 ======================= */
-const DEBUG_NEAREST = true;
+const SEG_THICK   = 0.20;    // ความหนาเส้น
+const SEG_HEIGHT  = 0.35;    // ยกเส้นให้ลอยจากพื้น (กันหาย/กันปื้น)
+const DRAW_EVERY  = 3;       // เว้นจุดเพื่อลดการทับซ้อน/ลดภาระ
+const MAX_RADIUS_M = 1200;   // แสดงเฉพาะรอบตัว
+const MAX_SEGMENTS = 800;    // จำกัดจำนวนเส้นให้เสถียรบน iPhone
+const BEARING_OFFSET = 90;   // ถ้าแนวเส้นแปลก ลอง 0 / 90 / -90
 
-// เส้นให้เห็นกลางแดด
-const SEG_THICK = 0.35;
-const SEG_HEIGHT = 0.12;
-
-// วาดถี่ขึ้น
-const DRAW_EVERY = 1;
-
-// ขยายรัศมีชั่วคราวเพื่อเช็กว่ามีข้อมูลใกล้ไหม
-const MAX_RADIUS_M = 6000;
-
-// กันค้าง
-const MAX_SEGMENTS = 3000;
-
-// ทิศทางเส้น (ถ้าไม่ตรงค่อยลอง 0 / 90 / -90)
-const BEARING_OFFSET = 90;
-
-// ป้าย (ปิดไว้ก่อนให้ลื่น)
-const ENABLE_LABELS = false;
-const LABEL_EVERY_N = 25;
+// แสดงบรรทัด “ใกล้ถนนที่สุด” เพื่อยืนยันว่ามีข้อมูลใกล้
+const SHOW_NEAREST_INFO = true;
 /* ======================= */
 
 const root = document.getElementById("root");
 const msg  = document.getElementById("msg");
 
 let userLat = null, userLon = null;
+let isDrawn = false; // ✅ ล็อกไม่ให้ redraw จนกดล้าง
 
 // ---------- GPS ----------
 navigator.geolocation.watchPosition(
@@ -124,11 +113,13 @@ navigator.geolocation.watchPosition(
     userLat = pos.coords.latitude;
     userLon = pos.coords.longitude;
     msg.textContent =
-      `GPS พร้อม\nlat: ${userLat.toFixed(6)}\nlon: ${userLon.toFixed(6)}\naccuracy: ${Math.round(pos.coords.accuracy)} m\nแนะนำ: กลางแจ้ง + Precise Location`;
+      `GPS พร้อม\nlat: ${userLat.toFixed(6)}\nlon: ${userLon.toFixed(6)}\naccuracy: ${Math.round(pos.coords.accuracy)} m\n` +
+      `แนะนำ: กลางแจ้ง + Precise Location`;
   },
   (err)=>{
     msg.textContent =
-      `❌ GPS ใช้งานไม่ได้\n${err.message}\nไปที่ Settings > Location Services > Safari > Precise Location`;
+      `❌ GPS ใช้งานไม่ได้\n${err.message}\n` +
+      `ไปที่ Settings > Location Services > Safari > Precise Location`;
   },
   { enableHighAccuracy:true, maximumAge:0, timeout:20000 }
 );
@@ -173,43 +164,24 @@ function addSegment(lat1, lon1, lat2, lon2){
   box.setAttribute("width", SEG_THICK);
   box.setAttribute("height", SEG_HEIGHT);
   box.setAttribute("depth", Math.max(1, len));
-  box.setAttribute("position", `0 ${SEG_HEIGHT/2} 0`);
+  // ✅ ยกเส้นให้ลอยจากพื้นชัด ๆ
+  box.setAttribute("position", `0 ${SEG_HEIGHT} 0`);
   box.setAttribute("color", "#ffffff");
 
-  // ⭐ FIX: ทำให้เส้นนอนบนพื้น
+  // ✅ นอนเส้นลงพื้น (กันพุ่งขึ้นฟ้า)
   box.setAttribute("rotation", `-90 ${brg} 0`);
 
   e.appendChild(box);
   root.appendChild(e);
-  return e;
-}
-
-function addLabel(ent, props){
-  const bg = document.createElement("a-plane");
-  bg.setAttribute("width", "4.8");
-  bg.setAttribute("height", "2.0");
-  bg.setAttribute("position", "0 2.3 0");
-  bg.setAttribute("color", "#000");
-  bg.setAttribute("opacity", "0.55");
-
-  const t = document.createElement("a-text");
-  t.setAttribute("value",
-    `ถนน (แสดงผล)\n${props.road_name || "—"}\n` +
-    `ราคาใหม่(ST_New): ${props.price_new ?? "—"}\n` +
-    `กว้าง(ม.): ${props.width_m ?? "—"}\n` +
-    `สาขา: ${props.office || "—"}`
-  );
-  t.setAttribute("position", "0 2.3 0.02");
-  t.setAttribute("align", "center");
-  t.setAttribute("width", "7.0");
-  t.setAttribute("color", "#fff");
-
-  ent.appendChild(bg);
-  ent.appendChild(t);
 }
 
 // ---------- Load + Draw ----------
 async function drawFile(file){
+  if (isDrawn){
+    msg.textContent += `\n\n(เส้นถูกวาดแล้ว) ถ้าจะวาดใหม่ให้กด “ล้าง” ก่อน`;
+    return;
+  }
+
   clearScene();
 
   if (userLat === null || userLon === null){
@@ -222,7 +194,7 @@ async function drawFile(file){
 
   const res = await fetch(url);
   if (!res.ok){
-    msg.textContent += `\n\n❌ HTTP ${res.status} โหลดไม่ได้: ${url}\nตรวจว่าไฟล์อยู่ใน data/ และชื่อไฟล์ตรง`;
+    msg.textContent += `\n\n❌ โหลดไฟล์ไม่สำเร็จ (HTTP ${res.status})\nตรวจว่าไฟล์อยู่ใน data/ และชื่อไฟล์ตรง`;
     return;
   }
 
@@ -230,8 +202,8 @@ async function drawFile(file){
   const feats = gj.features || [];
   msg.textContent += `\nโหลดสำเร็จ: features=${feats.length}`;
 
-  // DEBUG: หา "จุดถนนที่ใกล้ที่สุด"
-  if (DEBUG_NEAREST){
+  // คำนวณ “ใกล้ถนนที่สุด” จากจุดในไฟล์ (ช่วยยืนยันว่ามีข้อมูลแถวนี้)
+  if (SHOW_NEAREST_INFO){
     let nearest = Infinity;
     let nearestName = "";
     for (const f of feats){
@@ -245,9 +217,7 @@ async function drawFile(file){
       }
     }
     if (nearest < Infinity){
-      msg.textContent += `\n\nใกล้ถนนที่สุด: ${Math.round(nearest)} m\n${nearestName}`;
-    } else {
-      msg.textContent += `\n\n❌ ไม่พบจุด Point ในไฟล์นี้`;
+      msg.textContent += `\nใกล้ถนนที่สุด: ${Math.round(nearest)} m\n${nearestName}`;
     }
   }
 
@@ -260,7 +230,7 @@ async function drawFile(file){
     const key = p.road_key || p.road_name || "road";
     const pt_i = Number(p.pt_i ?? 0);
     if (!byRoad.has(key)) byRoad.set(key, []);
-    byRoad.get(key).push({lat, lon, pt_i, props: p});
+    byRoad.get(key).push({lat, lon, pt_i});
   }
 
   let count = 0;
@@ -269,8 +239,6 @@ async function drawFile(file){
   for (const pts of byRoad.values()){
     roads++;
     pts.sort((a,b)=>a.pt_i - b.pt_i);
-
-    let segCountThisRoad = 0;
 
     for (let i=0; i<pts.length - DRAW_EVERY; i += DRAW_EVERY){
       if (count >= MAX_SEGMENTS) break;
@@ -283,29 +251,25 @@ async function drawFile(file){
       const d = distMeters(userLat, userLon, midLat, midLon);
       if (d > MAX_RADIUS_M) continue;
 
-      const ent = addSegment(a.lat, a.lon, b.lat, b.lon);
+      addSegment(a.lat, a.lon, b.lat, b.lon);
       count++;
-      segCountThisRoad++;
-
-      if (ENABLE_LABELS && (segCountThisRoad % LABEL_EVERY_N === 1)){
-        addLabel(ent, a.props);
-      }
     }
   }
 
-  msg.textContent += `\n\nวาดเส้น: ${count} segments\nroads in file: ${roads}\nรัศมี: ${MAX_RADIUS_M} m (DEBUG)`;
+  msg.textContent += `\nวาดเส้น: ${count} segments\nroads in file: ${roads}\nรัศมีแสดงผล: ${MAX_RADIUS_M} m`;
+  isDrawn = true;
 }
 
-// Buttons
+// ---------- Buttons ----------
 document.getElementById("load").onclick = ()=>{
   const f = document.getElementById("dataset").value;
-  msg.textContent += `\n\n[CLICK] load = ${f}`;
-  if (!f) { msg.textContent += "\nกรุณาเลือกอำเภอ"; return; }
+  if (!f) { msg.textContent += "\n\nกรุณาเลือกอำเภอ"; return; }
   drawFile(f);
 };
 
 document.getElementById("clear").onclick = ()=>{
   clearScene();
+  isDrawn = false;
   msg.textContent += "\n\nล้างแล้ว";
 };
 </script>
