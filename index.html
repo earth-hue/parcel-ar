@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AR ถนนตามอำเภอ (เส้นถนน)</title>
+<title>AR ถนนตามอำเภอ (DEBUG)</title>
 
-<!-- A-Frame + AR.js -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
 
@@ -14,20 +13,20 @@
     margin: 0; padding: 0;
     width: 100%; height: 100%;
     overflow: hidden;
-    background: #000; /* กันจอขาวตอนโหลด */
+    background: #000;
     font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif;
   }
   a-scene {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    z-index: 1; /* ให้อยู่หลัง UI */
+    z-index: 1;
   }
   #ui {
     position: fixed;
     top: 10px; left: 10px; right: 10px;
     z-index: 9999;
-    background: rgba(0,0,0,.65);
+    background: rgba(0,0,0,.70);
     color: #fff;
     padding: 10px 12px;
     border-radius: 12px;
@@ -46,13 +45,13 @@
 <body>
 
 <div id="ui">
-  <b>โหมด AR ถนนตามอำเภอ (แสดงผลเป็นเส้น)</b><br/>
+  <b>โหมด AR ถนนตามอำเภอ (DEBUG)</b><br/>
   เลือกอำเภอ/ชุดข้อมูล:
   <br/>
   <select id="dataset">
     <option value="">-- เลือก --</option>
 
-    <!-- กลุ่มหลัก (ตรงกับไฟล์ของคุณ) -->
+    <!-- กลุ่มหลัก -->
     <option value="roads_ar_points_อำเภอเมืองอุทัยธานี.geojson">อำเภอเมืองอุทัยธานี</option>
     <option value="roads_ar_points_อำเภอบ้านไร่.geojson">อำเภอบ้านไร่</option>
     <option value="roads_ar_points_อำเภอหนองฉาง.geojson">อำเภอหนองฉาง</option>
@@ -62,7 +61,7 @@
     <option value="roads_ar_points_อำเภอห้วยคต.geojson">อำเภอห้วยคต</option>
     <option value="roads_ar_points_อำเภอหนองขาหย่าง.geojson">อำเภอหนองขาหย่าง</option>
 
-    <!-- ชุดหลุด/พิเศษ (ถ้าอัปโหลดไว้ด้วย) -->
+    <!-- ชุดหลุด/พิเศษ -->
     <option value="roads_ar_points_หนองขาหย่าง.geojson">หนองขาหย่าง (ชุดสั้น)</option>
     <option value="roads_ar_points_หนองฉาง.geojson">หนองฉาง (ชุดสั้น)</option>
     <option value="roads_ar_points_อำเภอเมือง.geojson">อำเภอเมือง (ชุดสั้น)</option>
@@ -88,18 +87,30 @@
 
 <script>
 /* =======================
-   CONFIG (ปรับได้)
+   CONFIG (DEBUG MODE)
+   ตั้งให้ "เห็นแน่" ก่อน
 ======================= */
-// ทำให้ลื่นสำหรับเดโม่ผู้บริหาร
-const SEG_THICK = 0.15;       // ความหนาเส้น
-const SEG_HEIGHT = 0.03;      // ความสูงเส้น (บาง ๆ)
-const DRAW_EVERY = 2;         // เชื่อมเว้นจุด (ลดจำนวนเส้น)
-const MAX_RADIUS_M = 1200;    // วาดเฉพาะรอบตัว 1.2 กม.
-const MAX_SEGMENTS = 1800;    // กันค้าง/กันภาพเพี้ยนบน iPhone
-const BEARING_OFFSET = 90;    // ถ้าแนวเส้นหันผิด ลอง 0 / 90 / -90
+const DEBUG_NEAREST = true;
 
-const LABEL_EVERY_N = 40;     // (ถ้าจะเปิดป้าย) ระยะติดป้ายห่าง ๆ
-const ENABLE_LABELS = false;  // ปิดไว้ก่อนเพื่อความลื่น
+// เส้นให้เห็นกลางแดด
+const SEG_THICK = 0.35;
+const SEG_HEIGHT = 0.12;
+
+// วาดถี่ขึ้น
+const DRAW_EVERY = 1;
+
+// ขยายรัศมีชั่วคราวเพื่อเช็กว่ามีข้อมูลใกล้ไหม
+const MAX_RADIUS_M = 6000;
+
+// กันค้าง
+const MAX_SEGMENTS = 3000;
+
+// ทิศทางเส้น (ถ้าไม่ตรงค่อยลอง 0 / 90 / -90)
+const BEARING_OFFSET = 90;
+
+// ป้าย (ปิดไว้ก่อนให้ลื่น)
+const ENABLE_LABELS = false;
+const LABEL_EVERY_N = 25;
 /* ======================= */
 
 const root = document.getElementById("root");
@@ -117,8 +128,7 @@ navigator.geolocation.watchPosition(
   },
   (err)=>{
     msg.textContent =
-      `❌ GPS ใช้งานไม่ได้\n${err.message}\n` +
-      `ไปที่ Settings > Location Services > Safari > Precise Location`;
+      `❌ GPS ใช้งานไม่ได้\n${err.message}\nไปที่ Settings > Location Services > Safari > Precise Location`;
   },
   { enableHighAccuracy:true, maximumAge:0, timeout:20000 }
 );
@@ -166,7 +176,7 @@ function addSegment(lat1, lon1, lat2, lon2){
   box.setAttribute("position", `0 ${SEG_HEIGHT/2} 0`);
   box.setAttribute("color", "#ffffff");
 
-  // ⭐ FIX สำคัญ: ทำให้เส้น “นอนบนพื้น” ไม่พุ่งขึ้นฟ้า
+  // ⭐ FIX: ทำให้เส้นนอนบนพื้น
   box.setAttribute("rotation", `-90 ${brg} 0`);
 
   e.appendChild(box);
@@ -207,18 +217,43 @@ async function drawFile(file){
     return;
   }
 
-  const res = await fetch(`./data/${file}`);
+  const url = `./data/${file}`;
+  msg.textContent += `\n\nกำลังโหลด: ${url}`;
+
+  const res = await fetch(url);
   if (!res.ok){
-    msg.textContent += `\n\n❌ โหลดไฟล์ไม่สำเร็จ: ${file}\nตรวจว่าอยู่ในโฟลเดอร์ data/ และชื่อไฟล์ตรง`;
+    msg.textContent += `\n\n❌ HTTP ${res.status} โหลดไม่ได้: ${url}\nตรวจว่าไฟล์อยู่ใน data/ และชื่อไฟล์ตรง`;
     return;
   }
 
-  msg.textContent += "\n\nกำลังโหลดข้อมูล…";
   const gj = await res.json();
+  const feats = gj.features || [];
+  msg.textContent += `\nโหลดสำเร็จ: features=${feats.length}`;
 
-  // group points by road_key แล้วเรียง pt_i
+  // DEBUG: หา "จุดถนนที่ใกล้ที่สุด"
+  if (DEBUG_NEAREST){
+    let nearest = Infinity;
+    let nearestName = "";
+    for (const f of feats){
+      if (!f.geometry || f.geometry.type !== "Point") continue;
+      const [lon, lat] = f.geometry.coordinates;
+      const p = f.properties || {};
+      const d = distMeters(userLat, userLon, lat, lon);
+      if (d < nearest){
+        nearest = d;
+        nearestName = p.road_name || p.road_key || "";
+      }
+    }
+    if (nearest < Infinity){
+      msg.textContent += `\n\nใกล้ถนนที่สุด: ${Math.round(nearest)} m\n${nearestName}`;
+    } else {
+      msg.textContent += `\n\n❌ ไม่พบจุด Point ในไฟล์นี้`;
+    }
+  }
+
+  // group by road_key แล้วเรียง pt_i
   const byRoad = new Map();
-  for (const f of (gj.features || [])){
+  for (const f of feats){
     if (!f.geometry || f.geometry.type !== "Point") continue;
     const [lon, lat] = f.geometry.coordinates;
     const p = f.properties || {};
@@ -229,11 +264,11 @@ async function drawFile(file){
   }
 
   let count = 0;
-  let shownRoads = 0;
+  let roads = 0;
 
   for (const pts of byRoad.values()){
+    roads++;
     pts.sort((a,b)=>a.pt_i - b.pt_i);
-    shownRoads++;
 
     let segCountThisRoad = 0;
 
@@ -252,17 +287,16 @@ async function drawFile(file){
       count++;
       segCountThisRoad++;
 
-      // ป้ายห่าง ๆ (ปิดไว้ก่อนเพื่อความลื่น)
       if (ENABLE_LABELS && (segCountThisRoad % LABEL_EVERY_N === 1)){
         addLabel(ent, a.props);
       }
     }
   }
 
-  msg.textContent += `\n\nแสดงเส้น: ${count}\nถนนในชุดข้อมูล: ${shownRoads}\nรัศมีแสดงผล: ${MAX_RADIUS_M} m`;
+  msg.textContent += `\n\nวาดเส้น: ${count} segments\nroads in file: ${roads}\nรัศมี: ${MAX_RADIUS_M} m (DEBUG)`;
 }
 
-// ---------- Buttons ----------
+// Buttons
 document.getElementById("load").onclick = ()=>{
   const f = document.getElementById("dataset").value;
   if (!f) { msg.textContent += "\n\nกรุณาเลือกอำเภอ"; return; }
